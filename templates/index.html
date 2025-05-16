@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart City</title>
+    <style>
+      :root {
+        --brown: #543310;
+        --golder: #cc9900;
+        --gold: #fff0dc;
+      }
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #f4f4f4;
+        background-image: url("../static/images/smartcity.jpg");
+        background-size: cover;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0px 8px 16px var(--golder);
+        text-align: center;
+        width: 400px;
+      }
+
+      h2 {
+        color: var(--brown);
+      }
+      label[for="fileInput"] {
+        visibility: hidden;
+        margin-top: 20px;
+      }
+
+      input[type="file"] {
+        display: block;
+        margin: 20px auto;
+        padding: 10px;
+        border: 2px dashed var(--golder);
+        border-radius: 10px;
+        width: 80%;
+        color: var(--brown);
+        background: var(--gold);
+        cursor: pointer;
+      }
+
+      input[type="file"]::file-selector-button {
+        background-color: var(--brown);
+        color: var(--gold);
+        border: none;
+        border-radius: 5px;
+        padding: 4px 8px;
+      }
+
+      button {
+        background: linear-gradient(135deg, var(--gold), var(--golder));
+        color: var(--brown);
+        border: none;
+        padding: 12px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .loading {
+        display: none;
+        margin-top: 20px;
+      }
+
+      .loading div {
+        width: 12px;
+        height: 12px;
+        margin: 4px;
+        background: var(--golder);
+        border-radius: 50%;
+        display: inline-block;
+        animation: bounce 0.8s infinite alternate;
+      }
+
+      .detections {
+        text-align: left;
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+        display: none;
+      }
+
+      .detection-list-container {
+        width: 100%;
+        aspect-ratio: 1/1; /* Ensures the height and width are equal */
+        overflow-y: auto;
+        max-height: 300px;
+        border: 1px solid var(--golder);
+        border-radius: 10px;
+        padding: 10px;
+        background: var(--gold);
+      }
+
+      #detectionList {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      #detectionList li {
+        padding: 8px;
+        /* margin-bottom: 5px; */
+        border-radius: 5px;
+        /* background: var(--golder); */
+        color: var(--brown);
+        font-weight: bold;
+        text-align: left;
+      }
+
+      @keyframes bounce {
+        from {
+          transform: translateY(0);
+        }
+        to {
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <button id="driveButton" onclick="checkThroughGoogleDrive(event)">
+        Check through Google Drive
+      </button>
+
+      <h2>Upload a Video File</h2>
+      <form onsubmit="uploadVideo(event)">
+        <label for="fileInput">Upload Video</label>
+        <input
+          type="file"
+          id="fileInput"
+          name="file"
+          accept="video/*"
+          required
+        />
+        <button id="uploadButton" type="submit">Upload</button>
+      </form>
+
+      <div id="loading" class="loading">
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+
+      <div class="detections" id="detections">
+        <h3>Detections:</h3>
+        <div class="detection-list-container">
+          <ul id="detectionList"></ul>
+        </div>
+      </div>
+    </div>
+
+    <script type="text/javascript">
+      function uploadVideo(event) {
+        event.preventDefault();
+        let formData = new FormData();
+        let fileInput = document.getElementById("fileInput");
+        let uploadButton = document.getElementById("uploadButton");
+        let loading = document.getElementById("loading");
+        let detectionSection = document.getElementById("detections");
+        let detectionList = document.getElementById("detectionList");
+
+        if (fileInput.files.length === 0) {
+          alert("Please select a file!");
+          return;
+        }
+
+        // Show loading state
+        loading.style.display = "block";
+        uploadButton.disabled = true;
+        detectionSection.style.display = "none";
+        detectionList.innerHTML = "";
+
+        formData.append("file", fileInput.files[0]);
+
+        fetch("http://127.0.0.1:5000/upload", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log(data);
+            if (data.detections && data.detections.length > 0) {
+              detectionSection.style.display = "block";
+              data.detections.forEach((det) => {
+                let listItem = document.createElement("li");
+                listItem.textContent = `${
+                  det.label
+                } detected with ${det.confidence.toFixed(2)}% confidence`;
+                detectionList.appendChild(listItem);
+              });
+            }
+          })
+          .catch((error) => console.error("Error:", error))
+          .finally(() => {
+            loading.style.display = "none";
+            uploadButton.disabled = false;
+          });
+      }
+
+      function checkThroughGoogleDrive(event) {
+        event.preventDefault();
+        let driveButton = document.getElementById("driveButton");
+        let loading = document.getElementById("loading");
+
+        loading.style.display = "flex";
+        driveButton.disabled = true;
+
+        fetch("http://127.0.0.1:5000/check_google_drive", { method: "POST" })
+          .then((response) => response.json())
+          .then((data) => alert(data.message))
+          .catch((error) => console.error("Error:", error))
+          .finally(() => {
+            loading.style.display = "none";
+            driveButton.disabled = false;
+          });
+      }
+    </script>
+  </body>
+</html>
